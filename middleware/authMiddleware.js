@@ -25,6 +25,16 @@ export const authMiddleware = (req, res, next) => {
 
     const token = parts[1];
 
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      return res.status(500).json({
+        success: false,
+        message: 'Internal server error: JWT configuration missing',
+        code: 'JWT_CONFIG_ERROR',
+      });
+    }
+
   } catch (error) {
     // Error handling will be added later
   }
