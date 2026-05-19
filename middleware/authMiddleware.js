@@ -49,6 +49,15 @@ export const authMiddleware = (req, res, next) => {
         details: error.message,
       });
     }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication error',
+      code: 'AUTH_ERROR',
+      details: error.message,
+    });
+
+    
   }
 };
 
