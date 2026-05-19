@@ -35,6 +35,10 @@ export const authMiddleware = (req, res, next) => {
       });
     }
 
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = decoded;
+    return next();
+
   } catch (error) {
     // Error handling will be added later
   }
