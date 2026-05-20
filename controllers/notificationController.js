@@ -25,5 +25,10 @@
 import NotificationLog from '../models/NotificationLog.js';
 
 export const processNotification = async (req, res) => {
-  
-    }
+    const {
+        senderSystem: providedSenderSystem,
+        recipientEmail,
+        subject,
+        message
+        } = req.body;
+}
