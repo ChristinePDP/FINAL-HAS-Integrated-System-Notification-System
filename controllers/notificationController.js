@@ -182,6 +182,17 @@ export const processNotification = async (req, res) => {
 
 
 export const getNotificationLogs = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, status, recipientEmail } = req.query;
 
+        const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+        const parsedLimit = Math.max(parseInt(limit, 10) || 10, 1);
 
+        const skip = (parsedPage - 1) * parsedLimit;
+
+        let query = {};
+
+    }
 }
+
+    
