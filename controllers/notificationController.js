@@ -210,6 +210,7 @@ export const getNotificationLogs = async (req, res) => {
           query.recipientEmail = recipientEmail;
         }
     }
+    }
      if (status) {
       query.status = status;
     }
@@ -229,7 +230,14 @@ export const getNotificationLogs = async (req, res) => {
     });
 
   } catch (error) {
-}
+    return res.status(500).json({
+      code: "FETCH_LOGS_ERROR",
+      message: "Failed to fetch notification logs",
+      error: error.message
+    });
+  }
+};
+
 
 
     
