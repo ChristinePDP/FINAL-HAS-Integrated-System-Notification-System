@@ -39,6 +39,13 @@ export const processNotification = async (req, res) => {
     });
   }
 
+    if (!isValidEmail(recipientEmail)) {
+      return res.status(400).json({
+        code: 'INVALID_EMAIL',
+        message: 'Invalid email format for recipientEmail.'
+      });
+    }
+    
     let senderSystem = 'Unknown System';
 
     if (providedSenderSystem) {
