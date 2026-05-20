@@ -220,6 +220,15 @@ export const getNotificationLogs = async (req, res) => {
       .skip(skip);
 
     const totalCount = await NotificationLog.countDocuments(query);
+
+    return res.status(200).json({
+      data: logs,
+      currentPage: parsedPage,
+      totalPages: Math.ceil(totalCount / parsedLimit),
+      totalCount
+    });
+
+  } catch (error) {
 }
 
 
