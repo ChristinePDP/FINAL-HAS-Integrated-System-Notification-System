@@ -203,6 +203,11 @@ export const getNotificationLogs = async (req, res) => {
        if (role === 'doctor') {
         query.senderEmail = req.user.email;
       }
+
+       if (role === 'admin') {
+        // admin can optionally filter by recipientEmail
+        if (recipientEmail) {
+          query.recipientEmail = recipientEmail;
         }
     }
 }
