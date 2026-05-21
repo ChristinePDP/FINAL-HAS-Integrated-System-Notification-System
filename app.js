@@ -77,5 +77,34 @@ const server = app.listen(PORT, () => {
   console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  
+  // Call limiter shutdown if available (defensive check)
+  logsLimiter?.shutdown?.();
+  
+  // Close server and exit
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+// Handle SIGINT signal (from Ctrl+C)
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  
+  // Call limiter shutdown if available (defensive check)
+  logsLimiter?.shutdown?.();
+  
+  // Close server and exit
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+
+
 
 export default app;
