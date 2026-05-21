@@ -56,7 +56,7 @@ app.use((err, req, res, next) => {
     stack: err.stack
   });
 
-  // Prepare error response
+
   const errorResponse = {
     success: false,
     message: err.message || 'Internal Server Error',
@@ -70,5 +70,12 @@ app.use((err, req, res, next) => {
 
   res.status(err.status || 500).json(errorResponse);
 });
+
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  console.log(`✓ Notification service started on port ${PORT}`);
+  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
 
 export default app;
