@@ -4,6 +4,8 @@ import cors from 'cors';
 import { connectDB } from './config/db.js';
 import notificationRoutes, { limiter as logsLimiter } from './routers/notificationRoutes.js';
 
+const app = express();
+
 app.set('trust proxy', true);
 
 app.use(cors({
@@ -80,31 +82,27 @@ const server = app.listen(PORT, () => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   
-  // Call limiter shutdown if available (defensive check)
+
   logsLimiter?.shutdown?.();
   
-  // Close server and exit
+
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
 });
 
-// Handle SIGINT signal (from Ctrl+C)
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
   
-  // Call limiter shutdown if available (defensive check)
+
   logsLimiter?.shutdown?.();
   
-  // Close server and exit
+ 
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
 });
-
-
-
 
 export default app;
