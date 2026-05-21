@@ -6,4 +6,9 @@ import notificationRoutes, { limiter as logsLimiter } from './routers/notificati
 
 app.set('trust proxy', true);
 
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}));
+
 export default app;
