@@ -11,5 +11,13 @@ router.post('/notify', authMiddleware, processNotification);
 
 router.get('/notification-logs', limiter, authMiddleware, getNotificationLogs);
 
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Notification service is running',
+    timestamp: new Date()
+  });
+});
+
 export default router;
 
