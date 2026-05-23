@@ -1,10 +1,5 @@
 import mongoose from 'mongoose';
 
-/*
- * NotificationLog Schema
- * Stores a log of all notification attempts (sent, failed, or duplicate)
- * for audit and duplicate detection purposes.
- */
 const notificationLogSchema = new mongoose.Schema({
   senderSystem: {
     type: String,

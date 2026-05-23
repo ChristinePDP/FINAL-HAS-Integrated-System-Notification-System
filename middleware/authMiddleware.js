@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
 
-// Auth middleware: verify JWT and attach decoded payload to `req.user`.
 export const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;

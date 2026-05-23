@@ -1,97 +1,77 @@
-
-
-/**
- * Process Notification Controller
- * 
- * Handles incoming notification requests forwarded by the Adapter Layer (Group 2).
- * The Adapter Layer is the ONLY external actor that directly calls this endpoint,
- * routing requests from various microservices (Appointment System, Queue System, etc.)
- * on their behalf.
- * 
- * Implements duplicate detection, email sending, and database logging.
- * 
- * Request body format (forwarded by Adapter Layer):
- * {
- *   "senderSystem": "string" (optional - original sender's name, e.g., "Appointment System"),
- *   "recipientEmail": "string",
- *   "subject": "string",
- *   "message": "string"
- * }
- * 
- * If senderSystem is not provided, it will be auto-detected from the JWT token's role.
- */
-
-
 import NotificationLog from '../models/NotificationLog.js';
+import { sendEmail } from '../config/mailer.js';
 
 export const processNotification = async (req, res) => {
   try {
-    const {
-      senderSystem: providedSenderSystem,
-      recipientEmail,
-      subject,
-      message
-    } = req.body;
+
+    const { senderSystem: providedSenderSystem, recipientEmail, subject, message } = req.body;
 
     if (!recipientEmail || !subject || !message) {
       return res.status(400).json({
+        success: false,
+        message: 'Adapter Layer: Missing required fields in forwarded request',
         code: 'MISSING_FIELDS',
-        message: 'Recipient email, subject, and message are required.'
-      });
-    }
-
-    if (!isValidEmail(recipientEmail)) {
-      return res.status(400).json({
-        code: 'INVALID_EMAIL',
-        message: 'Invalid email format for recipientEmail.'
+        required: ['recipientEmail', 'subject', 'message'],
+        received: { recipientEmail, subject, message },
       });
     }
 
     let senderSystem = 'Unknown System';
+    
+    if (providedSenderSystem && providedSenderSystem.trim()) {
 
-    if (providedSenderSystem) {
       senderSystem = providedSenderSystem;
-    } else if (req.user?.role) {
-      switch (req.user.role.toLowerCase()) {
-        case 'doctor':
-          senderSystem = 'Doctor Portal';
-          break;
-        case 'patient':
-          senderSystem = 'Patient Portal';
-          break;
-        case 'admin':
-          senderSystem = 'Admin System';
-          break;
-        default:
-          senderSystem = `${req.user.role} System`;
-      }
+      console.log(`[Adapter Layer] Using provided sender system: ${senderSystem}`);
+    } else if (req.user && req.user.role) {
+
+      const role = req.user.role;
+      if (role === 'Doctor') senderSystem = 'Doctor Portal';
+      else if (role === 'Patient') senderSystem = 'Patient Portal';
+      else if (role === 'Admin') senderSystem = 'Admin System';
+      else senderSystem = `${role} System`;
+      console.log(`[Adapter Layer] Auto-detected sender system from token role: ${senderSystem}`);
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Adapter Layer: Invalid email format in forwarded request',
+        code: 'INVALID_EMAIL',
+        recipientEmail,
+      });
     }
 
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-    const duplicateExists = await NotificationLog.findOne({
-      recipientEmail,
+    const duplicateRecord = await NotificationLog.findOne({
+      recipientEmail: recipientEmail.toLowerCase(),
       message,
       status: { $in: ['Sent', 'Duplicate'] },
-      createdAt: { $gte: fiveMinutesAgo }
+      createdAt: { $gte: fiveMinutesAgo },
     });
 
-    if (duplicateExists) {
-      const dupLog = await NotificationLog.create({
+    if (duplicateRecord) {
+
+      await NotificationLog.create({
         senderSystem,
-        recipientEmail,
+        recipientEmail: recipientEmail.toLowerCase(),
         subject,
         message,
         status: 'Duplicate',
-        emailSent: false,
-        errorMessage: 'Duplicate notification detected within 5 minutes.',
-        senderEmail: req.user?.email || null
       });
 
+      console.log(
+        `[Adapter Layer] ⚠ Duplicate notification detected for ${recipientEmail}. Original sent at ${duplicateRecord.createdAt}`
+      );
+
       return res.status(409).json({
+        success: false,
+        message: 'Adapter Layer: Duplicate notification detected. This exact message was already sent to this recipient within the last 5 minutes.',
         code: 'DUPLICATE_NOTIFICATION',
-        message: 'A similar notification was already sent within the last 5 minutes.',
-        logId: dupLog._id
+        originalNotificationTime: duplicateRecord.createdAt,
+        recipientEmail,
+        senderSystem,
       });
     }
 
@@ -101,143 +81,130 @@ export const processNotification = async (req, res) => {
     try {
       await sendEmail(recipientEmail, subject, message);
       emailSent = true;
+      console.log(`[Adapter Layer] ✅ Email sent successfully via ${senderSystem} to ${recipientEmail}`);
     } catch (error) {
-      emailSent = false;
       sendEmailError = error.message;
-
-      console.error(`Failed to send email:`, error);
+      console.error(`[Adapter Layer] ❌ Email sending failed for ${senderSystem}:`, sendEmailError);
     }
 
-    const savedLog = await NotificationLog.create({
+    const notificationLog = await NotificationLog.create({
       senderSystem,
-      recipientEmail,
+      senderEmail: req.user && req.user.email ? req.user.email.toLowerCase() : null,
+      recipientEmail: recipientEmail.toLowerCase(),
       subject,
       message,
       status: emailSent ? 'Sent' : 'Failed',
-      emailSent,
-      sendEmailError,
-      senderEmail: req.user?.email || null
+      errorDetails: sendEmailError,
     });
 
-    if (emailSent) {
-      return res.status(200).json({
-        code: 'NOTIFICATION_SENT',
-        message: 'Notification successfully processed and sent.',
-        logId: savedLog._id,
-        senderSystem: savedLog.senderSystem,
-        recipientEmail: savedLog.recipientEmail,
-        sentAt: savedLog.createdAt
+    if (!emailSent) {
+      return res.status(500).json({
+        success: false,
+        message: 'Adapter Layer: Failed to send notification email on behalf of sender system',
+        code: 'EMAIL_SEND_FAILED',
+        senderSystem,
+        details: sendEmailError,
+        logId: notificationLog._id,
       });
     }
 
-    return res.status(500).json({
-      code: 'EMAIL_SEND_FAILED',
-      message: 'Notification processed but email sending failed.',
-      logId: savedLog._id,
-      error: sendEmailError
+    return res.status(200).json({
+      success: true,
+      message: 'Adapter Layer: Notification forwarded and sent successfully',
+      code: 'NOTIFICATION_SENT',
+      data: {
+        logId: notificationLog._id,
+        senderSystem,
+        recipientEmail,
+        sentAt: notificationLog.createdAt,
+      },
     });
-
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('[Adapter Layer] Unexpected error in processNotification:', error);
 
-    
-    const errorLog = await NotificationLog.create({
-      senderSystem:
-        req.body?.senderSystem ||
-        (req.user?.role ? `${req.user.role} System` : 'Unknown System'),
-
-      recipientEmail: req.body?.recipientEmail || 'unknown_recipient',
-      subject: req.body?.subject || 'unknown_subject',
-      message: req.body?.message || 'unknown_message',
-
-      status: 'Failed',
-      emailSent: false,
-      errorMessage: error.message,
-      senderEmail: req.user?.email || null
-    });
+    try {
+      const { senderSystem, recipientEmail, subject, message } = req.body;
+      if (recipientEmail) {
+        await NotificationLog.create({
+          senderSystem: senderSystem || 'Unknown',
+          recipientEmail: recipientEmail.toLowerCase(),
+          subject: subject || 'N/A',
+          message: message || 'N/A',
+          status: 'Failed',
+          errorDetails: error.message,
+        });
+      }
+    } catch (dbError) {
+      console.error('Failed to log error to database:', dbError.message);
+    }
 
     return res.status(500).json({
+      success: false,
+      message: 'Internal server error while processing notification',
       code: 'INTERNAL_ERROR',
-      message: 'An unexpected internal server error occurred.',
-      logId: errorLog._id,
-      error: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Contact support if this persists',
     });
   }
-
-  const errorLog = await NotificationLog.create({
-    senderSystem:
-        req.body?.senderSystem ||
-        (req.user?.role ? `${req.user.role} System` : 'Unknown System'),
-
-    recipientEmail: req.body?.recipientEmail || 'unknown_recipient',
-    subject: req.body?.subject || 'unknown_subject',
-    message: req.body?.message || 'unknown_message',
-
-    status: 'Failed',
-    emailSent: false,
-    errorMessage: error.message,
-    senderEmail: req.user?.email || null
-    });
 };
 
 export const getNotificationLogs = async (req, res) => {
-    try {
-        const { page = 1, limit = 10, status, recipientEmail } = req.query;
+  try {
+    const { page = 1, limit = 20, status } = req.query;
 
-        const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
-        const parsedLimit = Math.max(parseInt(limit, 10) || 10, 1);
+    const query = {};
 
-        const skip = (parsedPage - 1) * parsedLimit;
+    if (status) query.status = status;
 
-        let query = {};
+    const user = req.user;
 
-        if (!req.user || !req.user.role) {
-      query.recipientEmail = 'unauthorized_access';
-    } else {
-      const role = req.user.role.toLowerCase();
+    if (!user || !user.role) {
+      query.recipientEmail = 'unauthorized_access'; 
+    } 
 
-      if (role === 'patient') {
-        query.recipientEmail = req.user.email;
+    else if (user.role?.toLowerCase() === 'patient') {
+      if (!user.email) {
+        return res.status(400).json({ success: false, message: "Token payload missing 'email' for patient validation." });
       }
+      query.recipientEmail = user.email.toLowerCase();
+    } 
 
-       if (role === 'doctor') {
-        query.senderEmail = req.user.email;
+    else if (user.role?.toLowerCase() === 'doctor') {
+      if (!user.email) {
+        return res.status(400).json({ success: false, message: "Token payload missing 'email' for doctor validation." });
       }
+      query.senderEmail = user.email.toLowerCase();
+    } 
 
-       if (role === 'admin') {
-        // admin can optionally filter by recipientEmail
-        if (recipientEmail) {
-          query.recipientEmail = recipientEmail;
-        }
-    }
-    }
-     if (status) {
-      query.status = status;
+    else if (user.role?.toLowerCase() === 'admin') {
+      if (req.query.recipientEmail) {
+        query.recipientEmail = req.query.recipientEmail.toLowerCase();
+      }
     }
 
     const logs = await NotificationLog.find(query)
       .sort({ createdAt: -1 })
-      .limit(parsedLimit)
-      .skip(skip);
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .exec();
 
     const totalCount = await NotificationLog.countDocuments(query);
 
     return res.status(200).json({
+      success: true,
       data: logs,
-      currentPage: parsedPage,
-      totalPages: Math.ceil(totalCount / parsedLimit),
-      totalCount
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+      },
     });
-
   } catch (error) {
+    console.error('Error fetching notification logs:', error.message);
     return res.status(500).json({
-      code: "FETCH_LOGS_ERROR",
-      message: "Failed to fetch notification logs",
-      error: error.message
+      success: false,
+      message: 'Failed to retrieve notification logs',
+      code: 'FETCH_LOGS_ERROR',
+      details: error.message,
     });
   }
 };
-
-
-
-    

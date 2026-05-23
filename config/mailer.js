@@ -1,9 +1,6 @@
-// 
-
 import nodemailer from 'nodemailer';
 import 'dotenv/config';
 
-// GMAIL CONFIGURATION
 const transporter = nodemailer.createTransport({
   service: process.env.NODEMAILER_SERVICE || 'gmail',
   auth: {
@@ -15,7 +12,7 @@ const transporter = nodemailer.createTransport({
 export const sendEmail = async (to, subject, text) => {
   try {
     const mailOptions = {
-      from: `"Hospital Notification System" <${process.env.NODEMAILER_USER}>`, // Ito yung lalabas na pangalan sa sender
+      from: `"Hospital Notification System" <${process.env.NODEMAILER_USER}>`,
       to,
       subject,
       text,

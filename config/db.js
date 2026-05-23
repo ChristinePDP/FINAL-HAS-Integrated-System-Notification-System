@@ -1,9 +1,5 @@
 import mongoose from 'mongoose';
 
-/**
- * Database Connection Function
- * Establishes connection to MongoDB and handles connection errors gracefully.
- */
 export const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGO_URI;
@@ -21,14 +17,10 @@ export const connectDB = async () => {
     return mongoose.connection;
   } catch (error) {
     console.error('✗ MongoDB connection failed:', error.message);
-    process.exit(1); // Exit process if DB connection fails
+    process.exit(1); 
   }
 };
 
-/**
- * Database Disconnection Function
- * Safely closes the MongoDB connection.
- */
 export const disconnectDB = async () => {
   try {
     await mongoose.disconnect();

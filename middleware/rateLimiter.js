@@ -1,12 +1,9 @@
-// Very small, simple in-memory rate limiter (per-IP).
-// Purpose: keep it minimal for learning and basic DoS protection.
 export default function rateLimiter(opts = {}) {
   const windowMs = opts.windowMs ?? Number(process.env.RATE_LIMIT_WINDOW_MS) ?? 60_000;
   const maxRequests = opts.max ?? Number(process.env.RATE_LIMIT_MAX_REQUESTS) ?? 10;
 
   const hits = new Map();
 
-  // Periodic cleanup to avoid unbounded memory growth
   const cleaner = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of hits) if (entry.resetTime <= now) hits.delete(key);
@@ -27,7 +24,6 @@ export default function rateLimiter(opts = {}) {
       const current = hits.get(ip);
       const remaining = Math.max(0, maxRequests - current.count);
 
-      // Basic response headers (helpful but optional)
       res.set('X-RateLimit-Limit', String(maxRequests));
       res.set('X-RateLimit-Remaining', String(remaining));
 
@@ -39,7 +35,7 @@ export default function rateLimiter(opts = {}) {
 
       return next();
     } catch (err) {
-      // On error, allow the request rather than blocking legitimate traffic
+
       console.error('rateLimiter error:', err);
       return next();
     }
