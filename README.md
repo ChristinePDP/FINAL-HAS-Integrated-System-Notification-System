@@ -16,7 +16,7 @@ Before interacting with the Notification System, you must authenticate to retrie
 **Request Body:**
 ```json
 { 
-  "username": "your_username", 
+  "email": "email", 
   "password": "your_password" 
 }
 
@@ -175,6 +175,7 @@ Since this is a `GET` request, parameters and filters must be passed directly in
 | **`401 Unauthorized`** | Expired, corrupt, or missing JWT token. | Re-authenticate via the Auth login endpoint to fetch a fresh token. |
 | **`403 Forbidden`** | Standard account attempting to query restricted logs. | Ensure the requesting account has administrative permissions before using `recipientEmail`. |
 | **`400 Bad Request`** | Missing required properties in the request payload. | Ensure `senderSystem`, `recipientEmail`, `subject`, and `message` are completely provided. |
+| **`429 Too Many Requests`** | Request Limit. | Try Again after 60s. |
 
 ```
 
