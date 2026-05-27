@@ -1,5 +1,5 @@
 import express from 'express';
-import { rateLimiter } from '../middleware/rateLimiter.js';
+import  rateLimiter  from '../middleware/rateLimiter.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { processNotification, getNotificationLogs } from '../controllers/notificationController.js';
 
@@ -18,7 +18,6 @@ router.get('/health', (req, res) => {
     timestamp: new Date()
   });
 });
-
 
 export default router;
 
